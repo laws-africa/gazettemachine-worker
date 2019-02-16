@@ -77,13 +77,15 @@ class GazetteMachine:
         return tmp
 
     def identify(self, info):
+        info['jurisdiction'] = info['s3_location'].split('/', 2)[1]
+        identifier = {'na': self.identify_na}[info['jurisdiction']]
+
         try:
             coverpage = self.get_coverpage_text()
         except RequiresOCR:
             self.ocr_to_s3(info)
             coverpage = self.get_coverpage_text()
 
-        identifier = {'na': self.identify_na}[info['jurisdiction']]
         identifier(info, coverpage)
 
         return info
