@@ -77,7 +77,8 @@ class GazetteMachine:
         return tmp
 
     def identify(self, info):
-        info['jurisdiction'] = info['s3_location'].split('/', 2)[1]
+        if not info.get('jurisdiction'):
+            info['jurisdiction'] = info['s3_location'].split('/', 2)[1]
         identifier = {'na': self.identify_na}[info['jurisdiction']]
 
         try:
@@ -98,18 +99,8 @@ class GazetteMachine:
         ocr_key = '{}-ocr.pdf'.format(key)
         ocr_location = '{}/{}'.format(self.WORKING_BUCKET, ocr_key)
 
-        # TODO: do OCR and write it into the original file
-        with tempfile.NamedTemporaryFile() as tmp:
-            self.ocr_file(tmp.name)
-
-            # copy OCRd file into old one
-            tmp.seek(0)
-            self.tmpfile.seek(0)
-            while True:
-                data = tmp.read(4096)
-                if not data:
-                    break
-                self.tmpfile.write(data)
+        # OCR the file in place
+        self.ocr_file(self.tmpfile.name)
 
         self.tmpfile.flush()
         self.tmpfile.seek(0)
@@ -122,9 +113,22 @@ class GazetteMachine:
         info.setdefault('sources', []).append(info['s3_location'])
         info['s3_location'] = ocr_location
 
-    def ocr_file(self, fname):
-        # TODO: ocr and optimise
-        pass
+    def ocr_file(self, target):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # make a multipage tiff of the original PDF
+            tiffs = "{}/images.tiff".format(tmpdir)
+            result = subprocess.run(["gs", "-o", tiffs, "-sDEVICE=tiff32nc", "-r300", self.tmpfile.name])
+            result.check_returncode()
+
+            # OCR using tesseract to produce a pdf
+            pdf = "{}/ocr-output".format(tmpdir)
+            result = subprocess.run(["tesseract", tiffs, pdf, "pdf"])
+            result.check_returncode()
+
+            # convert images in resulting PDF to reduce size
+            result = subprocess.run([
+                "gs", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+                "-dCompatibilityLevel=1.4", "-dPDFSETTINGS=/ebook", "-sOutputFile={}".format(target), "{}.pdf".format(pdf)])
 
     def archive(self, info):
         # move to target S3 bucket
@@ -179,7 +183,6 @@ class GazetteMachine:
         if not ('GOVERNMENT GAZETTE' in coverpage and 'REPUBLIC OF NAMIBIA' in coverpage):
             return None
 
-        info['jurisdiction'] = 'na'
         info['publication'] = 'government-gazette'
 
         # number
