@@ -1,3 +1,6 @@
+import json
+import boto3
+
 from gm.gm import GazetteMachine
 
 
@@ -6,10 +9,25 @@ def identify_and_archive(event, context):
     return gm.identify_and_archive(event)
 
 
-if __name__ == '__main__':
-    import ipdb; ipdb.set_trace()
-    print(GazetteMachine().identify_and_archive({
-        'fname': '3564.pdf',
-        's3_location': 'bucket/dropbox/na/3564.pdf',
-        'jurisdiction': 'na',
-    }))
+def incoming_from_s3(event, context):
+    ecs = boto3.client('ecs')
+
+    for record in event['Records']:
+        s3_location = '/'.join([record['s3']['bucket']['name'], record['s3']['object']['key']])
+        info = {'s3_location': s3_location}
+
+        ecs.run_task(
+            cluster='default',
+            taskDefinition='identify-gazette',
+            overrides={
+                'containerOverrides': [{
+                    'command': ['--identify', '--info', json.dumps(info)],
+                }]
+            },
+            startedBy='lambda',
+            launchType='FARGATE',
+        )
+
+    return {
+        'statusCode': 200,
+    }

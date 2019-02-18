@@ -46,7 +46,11 @@ class MetadataStore:
     def manually_identify(self, info):
         resp = self.session.post(self.base_url + '/tasks/', json={
             's3_location': info['s3_location'],
-            'info': info
+            'jurisdiction': info.get('jurisdiction'),
+            'date': info.get('date'),
+            'publication': info.get('publication'),
+            'number': info.get('number'),
+            'name': info.get('name'),
         })
 
         if resp.status_code == 400:
@@ -99,7 +103,10 @@ class GazetteMachine:
         self.metadata = MetadataStore()
 
     def identify_and_archive(self, info):
-        """ Attempt to identify and archive a gazette
+        """ Attempt to identify and archive a gazette.
+
+        The provided info may already be identified. If so, it will safely
+        be archived.
         """
         with self.fetch(info) as tmp:
             self.tmpfile = tmp
@@ -124,29 +131,42 @@ class GazetteMachine:
         return tmp
 
     def identify(self, info):
-        if not info.get('jurisdiction'):
-            if info['s3_location'].startswith(self.INCOMING_BUCKET):
-                # lawsafrica-incoming/dropbox/na/file
-                info['jurisdiction'] = info['s3_location'].split('/', 3)[2]
+        if not info.get('identified'):
+            if not info.get('jurisdiction'):
+                if info['s3_location'].startswith(self.INCOMING_BUCKET):
+                    # lawsafrica-incoming/dropbox/na/file
+                    info['jurisdiction'] = info['s3_location'].split('/', 3)[2]
 
-        if not info.get('jurisdiction'):
+            if not info.get('jurisdiction'):
+                return False
+
+            identifier = {'na': IdentifierNA}[info['jurisdiction']]()
+
+            self.tmpfile.seek(0, 2)
+            info['size'] = self.tmpfile.tell()
+            self.tmpfile.seek(0)
+
+            try:
+                coverpage = self.get_coverpage_text()
+            except RequiresOCR:
+                self.ocr_to_s3(info)
+                try:
+                    coverpage = self.get_coverpage_text()
+                except RequiresOCR:
+                    return False
+
+            identifier.identify(info, coverpage, self.tmpfile)
+
+        if not info.get('identified'):
             return False
 
-        identifier = {'na': IdentifierNA}[info['jurisdiction']]()
+        #  fill in remaining details
+        info['publication_code'] = info['publication'].lower().replace(' ', '-')
+        info['key'] = '{jurisdiction}-{publication_code}-dated-{date}-no-{number}'.format(**info)
+        info['name'] = '{jurisdiction_name} {publication} dated {date} number {number}'.format(**info)
+        info['frbr_work_uri'] = '{jurisdiction}/{publication_code}/{date}/{number}'.format(**info)
 
-        self.tmpfile.seek(0, 2)
-        info['size'] = self.tmpfile.tell()
-        self.tmpfile.seek(0)
-
-        try:
-            coverpage = self.get_coverpage_text()
-        except RequiresOCR:
-            self.ocr_to_s3(info)
-            coverpage = self.get_coverpage_text()
-
-        identifier.identify(info, coverpage, self.tmpfile)
-
-        return info
+        return True
 
     def manually_identify(self, info):
         """ Setup a task to manually identify this gazette.
@@ -267,9 +287,10 @@ class IdentifierNA:
         info['identified'] = False
 
         if not ('GOVERNMENT GAZETTE' in coverpage and 'REPUBLIC OF NAMIBIA' in coverpage):
-            return None
+            return False
 
-        info['publication'] = 'government-gazette'
+        info['jurisdiction_name'] = 'Namibia'
+        info['publication'] = 'Government Gazette'
 
         # number
         match = self.NA_NUMBER_RE.search(coverpage)
@@ -284,9 +305,3 @@ class IdentifierNA:
             info['year'] = str(date.year)
 
         info['identified'] = bool(info.get('number') and info.get('date'))
-        if info['identified']:
-            info['key'] = '{jurisdiction}-{publication}-dated-{date}-no-{number}'.format(**info)
-            info['name'] = 'Namibia Government Gazette dated {date} number {number}'.format(**info)
-            info['frbr_work_uri'] = '{jurisdiction}/gazette/{date}/{number}'.format(**info)
-
-        return info['identified']
