@@ -3,15 +3,55 @@ import tempfile
 import subprocess
 import re
 import logging
+import os
 
 import boto3
+import requests
 
 
 log = logging.getLogger(__name__)
 
+GM_API_URL = os.environ.get('GM_API_URL', 'https://api.gazettes.laws.africa/v1')
+GM_AUTH_TOKEN = os.environ.get('GM_AUTH_TOKEN', '')
+
 
 class RequiresOCR(Exception):
     pass
+
+
+class MetadataStore:
+    """ Wrapper around the GazetteMachine metadata store API.
+    """
+    def __init__(self):
+        self.base_url = GM_API_URL
+        self.session = requests.Session()
+        self.session.headers.update({'Authorization': 'Token %s' % GM_AUTH_TOKEN})
+
+    def save_gazette(self, info):
+        log.info("Saving gazette: %s" % info)
+        resp = self.session.post(self.base_url + '/gazettes/', json=info)
+
+        # already exists?
+        if resp.status_code == 400 and "gazette with this key already exists." in resp.json().get('key', []):
+            log.info("Gazette already exists")
+            return False
+
+        if resp.status_code == 400:
+            log.info(resp.text)
+        resp.raise_for_status()
+
+        log.info("Responded %s" % resp.status_code)
+        return resp.json()
+
+    def manually_identify(self, info):
+        resp = self.session.post(self.base_url + '/tasks/', json=info)
+
+        if resp.status_code == 400:
+            log.info(resp.text)
+        resp.raise_for_status()
+
+        log.info("Responded %s" % resp.status_code)
+        return resp.json()
 
 
 class GazetteMachine:
@@ -40,20 +80,20 @@ class GazetteMachine:
       publication: name of publication, eg. Government Gazette
       key: fully unique key, eg. "na-government-gazette-dated-2018-01-01-no-31"
       frbr_work_uri: /na/gazette/2018-01-01/31
-      name: friendly, formatted name, eg. "Namibia Government Gazette dated 2018-01-01 number 3"
+      name: friendly, formatted name, eg. "Namibia Government Gazette dated 2018-01-01 number 31"
 
     """
 
-    WORKING_BUCKET = 'lawsafrica-gazettes-working'
+    INCOMING_BUCKET = 'lawsafrica-gazettes-incoming'
+    DROPBOX_PATH = 'dropbox/'
+    TEMP_PATH = 'temp/'
     ARCHIVE_BUCKET = 'lawsafrica-gazettes-archive'
     ARCHIVE_PATH = 'archive/'
     SOURCES_PATH = 'sources/'
 
-    NA_NUMBER_RE = re.compile(r'^No.\s+(\d+)$', re.MULTILINE)
-    DATE_RE = re.compile(r'\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b')
-
     def __init__(self):
         self.s3 = boto3.client('s3')
+        self.metadata = MetadataStore()
 
     def identify_and_archive(self, info):
         """ Attempt to identify and archive a gazette
@@ -62,24 +102,33 @@ class GazetteMachine:
             self.tmpfile = tmp
 
             if self.identify(info):
-                self.archive(info)
+                log.info("Identified {} as {}".format(info['s3_location'], info['key']))
+                return self.archive(info)
             else:
-                self.manual_ident(info)
-
-        return info
+                self.manually_identify(info)
+                return False
 
     def fetch(self, info):
         if 'fname' in info:
             return open(info['fname'], 'r+b')
 
+        log.info("Dowloading {} from S3".format(info['s3_location']))
+
         tmp = tempfile.NamedTemporaryFile()
-        self.s3.download_file(info['s3_bucket'], info['s3_key'], tmp.name)
+        bucket, key = info['s3_location'].split('/', 1)
+        self.s3.download_file(bucket, key, tmp.name)
         return tmp
 
     def identify(self, info):
         if not info.get('jurisdiction'):
-            info['jurisdiction'] = info['s3_location'].split('/', 2)[1]
-        identifier = {'na': self.identify_na}[info['jurisdiction']]
+            if info['s3_location'].startswith(self.INCOMING_BUCKET):
+                # lawsafrica-incoming/dropbox/na/file
+                info['jurisdiction'] = info['s3_location'].split('/', 3)[2]
+
+        if not info.get('jurisdiction'):
+            return False
+
+        identifier = {'na': IdentifierNA}[info['jurisdiction']]()
 
         try:
             coverpage = self.get_coverpage_text()
@@ -87,9 +136,14 @@ class GazetteMachine:
             self.ocr_to_s3(info)
             coverpage = self.get_coverpage_text()
 
-        identifier(info, coverpage)
+        identifier.identify(info, coverpage, self.tmpfile)
 
         return info
+
+    def manually_identify(self, info):
+        """ Setup a task to manually identify this gazette.
+        """
+        self.metadata.manually_identify(info)
 
     def ocr_to_s3(self, info):
         """ OCR the file in f, write it back into f AND to S3, and update
@@ -97,7 +151,7 @@ class GazetteMachine:
         """
         key = info['s3_location'].split('/', 1)[1]
         ocr_key = '{}-ocr.pdf'.format(key)
-        ocr_location = '{}/{}'.format(self.WORKING_BUCKET, ocr_key)
+        ocr_location = '{}/{}/{}'.format(self.INCOMING_BUCKET, self.TEMP_PATH, ocr_key)
 
         # OCR the file in place
         self.ocr_file(self.tmpfile.name)
@@ -108,7 +162,7 @@ class GazetteMachine:
         log.info("Uploading OCRd {} to {}".format(info['s3_location'], ocr_location))
 
         # copy OCRd file to s3
-        self.s3.put_object(Bucket=self.WORKING_BUCKET, Key=ocr_key, Body=self.tmpfile)
+        self.s3.put_object(Bucket=self.INCOMING_BUCKET, Key=ocr_key, Body=self.tmpfile)
 
         info.setdefault('sources', []).append(info['s3_location'])
         info['s3_location'] = ocr_location
@@ -131,37 +185,55 @@ class GazetteMachine:
                 "-dCompatibilityLevel=1.4", "-dPDFSETTINGS=/ebook", "-sOutputFile={}".format(target), "{}.pdf".format(pdf)])
 
     def archive(self, info):
-        # move to target S3 bucket
-        dest = self.ARCHIVE_PATH + info['key'] + ".pdf"
-        log.info("Moving primary {} to {}/{}".format(info['s3_location'], self.ARCHIVE_BUCKET, dest))
+        # final resting place
+        dest = self.ARCHIVE_PATH + "{jurisdiction}/{year}/{key}.pdf".format(**info)
 
-        self.s3.copy_object(
-            CopySource=info['s3_location'],
-            Bucket=self.ARCHIVE_BUCKET,
-            Key=dest,
-        )
-        bucket, key = info['s3_location'].split('/', 1)
-        self.s3.delete_object(Bucket=bucket, Key=key)
+        # save to gazette metadata store
+        temp = dict(info)
+        temp['s3_location'] = "{}/{}".format(self.ARCHIVE_BUCKET, dest)
+        saved = self.metadata.save_gazette(temp)
 
-        # move original sources, too, if they're different
-        i = 0
+        # only archive if the gazette didn't already exist
+        if saved is not False:
+            # copy to archival S3 bucket
+            log.info("Copying primary {} to {}/{}".format(info['s3_location'], self.ARCHIVE_BUCKET, dest))
+
+            self.s3.copy_object(
+                CopySource=info['s3_location'],
+                Bucket=self.ARCHIVE_BUCKET,
+                Key=dest,
+            )
+
+            # archive original sources, if they're different to the primary resource
+            i = 0
+            for source in info.get('sources', []):
+                if source != info['s3_location']:
+                    i += 1
+
+                    # move to target S3 bucket
+                    dest = self.SOURCES_PATH + info['key'] + "-source-{}.pdf".format(i)
+                    log.info("Copying source {} to {}/{}".format(source, self.ARCHIVE_BUCKET, dest))
+
+                    self.s3.copy_object(
+                        CopySource=source,
+                        Bucket=self.ARCHIVE_BUCKET,
+                        Key=dest,
+                    )
+
+        self.cleanup(info)
+
+        return saved
+
+    def cleanup(self, info):
         for source in info.get('sources', []):
             if source != info['s3_location']:
-                i += 1
-
-                # move to target S3 bucket
-                dest = self.SOURCES_PATH + info['key'] + "-source-{}.pdf".format(i)
-                log.info("Moving source {} to {}/{}".format(source, self.ARCHIVE_BUCKET, dest))
-
-                self.s3.copy_object(
-                    CopySource=source,
-                    Bucket=self.ARCHIVE_BUCKET,
-                    Key=dest,
-                )
+                log.info("Deleting {}".format(source))
                 bucket, key = source.split('/', 1)
                 self.s3.delete_object(Bucket=bucket, Key=key)
 
-        return info
+        log.info("Deleting {}".format(info['s3_location']))
+        bucket, key = info['s3_location'].split('/', 1)
+        self.s3.delete_object(Bucket=bucket, Key=key)
 
     def get_coverpage_text(self):
         with tempfile.NamedTemporaryFile() as tmp:
@@ -177,7 +249,12 @@ class GazetteMachine:
 
         return coverpage
 
-    def identify_na(self, info, coverpage):
+
+class IdentifierNA:
+    NA_NUMBER_RE = re.compile(r'^No.\s+(\d+)$', re.MULTILINE)
+    DATE_RE = re.compile(r'\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b')
+
+    def identify(self, info, coverpage, f):
         info['identified'] = False
 
         if not ('GOVERNMENT GAZETTE' in coverpage and 'REPUBLIC OF NAMIBIA' in coverpage):
@@ -199,8 +276,7 @@ class GazetteMachine:
 
         info['identified'] = bool(info.get('number') and info.get('date'))
         if info['identified']:
-            info['id'] = '{jurisdiction}-{publication}-dated-{date}-no-{number}'.format(**info)
-            info['key'] = '{jurisdiction}/{year}/{id}.pdf'.format(**info)
+            info['key'] = '{jurisdiction}-{publication}-dated-{date}-no-{number}'.format(**info)
             info['name'] = 'Namibia Government Gazette dated {date} number {number}'.format(**info)
             info['frbr_work_uri'] = '{jurisdiction}/gazette/{date}/{number}'.format(**info)
 
