@@ -16,4 +16,4 @@ ADD . /app
 
 WORKDIR /app
 
-ENTRYPOINT ["python3", "service.py"]
+ENTRYPOINT ["python3", "worker.py"]
