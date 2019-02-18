@@ -104,7 +104,7 @@ class GazetteMachine:
         with self.fetch(info) as tmp:
             self.tmpfile = tmp
 
-            if False and self.identify(info):
+            if self.identify(info):
                 log.info("Identified {} as {}".format(info['s3_location'], info['key']))
                 return self.archive(info)
             else:
@@ -120,7 +120,7 @@ class GazetteMachine:
 
         tmp = tempfile.NamedTemporaryFile()
         bucket, key = info['s3_location'].split('/', 1)
-        self.s3.download_file(bucket, key, tmp.name)
+        self.s3.download_fileobj(bucket, key, tmp)
         return tmp
 
     def identify(self, info):
@@ -133,6 +133,10 @@ class GazetteMachine:
             return False
 
         identifier = {'na': IdentifierNA}[info['jurisdiction']]()
+
+        self.tmpfile.seek(0, 2)
+        info['size'] = self.tmpfile.tell()
+        self.tmpfile.seek(0)
 
         try:
             coverpage = self.get_coverpage_text()
@@ -170,6 +174,7 @@ class GazetteMachine:
 
         info.setdefault('sources', []).append(info['s3_location'])
         info['s3_location'] = ocr_location
+        info['ocred'] = True
 
     def ocr_file(self, target):
         with tempfile.TemporaryDirectory() as tmpdir:
