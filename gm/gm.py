@@ -12,7 +12,7 @@ import requests
 log = logging.getLogger(__name__)
 
 GM_API_URL = os.environ.get('GM_API_URL', 'https://api.gazettes.laws.africa/v1')
-GM_AUTH_TOKEN = os.environ.get('GM_AUTH_TOKEN', '')
+GM_AUTH_TOKEN = os.environ.get('GM_AUTH_TOKEN')
 
 
 class RequiresOCR(Exception):
@@ -44,7 +44,10 @@ class MetadataStore:
         return resp.json()
 
     def manually_identify(self, info):
-        resp = self.session.post(self.base_url + '/tasks/', json=info)
+        resp = self.session.post(self.base_url + '/tasks/', json={
+            's3_location': info['s3_location'],
+            'info': info
+        })
 
         if resp.status_code == 400:
             log.info(resp.text)
@@ -101,10 +104,11 @@ class GazetteMachine:
         with self.fetch(info) as tmp:
             self.tmpfile = tmp
 
-            if self.identify(info):
+            if False and self.identify(info):
                 log.info("Identified {} as {}".format(info['s3_location'], info['key']))
                 return self.archive(info)
             else:
+                log.info("Gazette {} requires manual identification".format(info['s3_location']))
                 self.manually_identify(info)
                 return False
 
