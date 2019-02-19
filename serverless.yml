@@ -1,0 +1,35 @@
+# This file is the main config file for your service.
+# For full config options, check the docs:
+#    docs.serverless.com
+
+service: GazetteMachine
+
+provider:
+  name: aws
+  runtime: python3.7
+  region: eu-west-1
+  profile: lawsafrica
+  stage: production
+
+package:
+  exclude:
+    - "./**"
+  include:
+    - service.py
+
+functions:
+  ArchiveGazette:
+    handler: service.identify_and_archive
+    events:
+      - http:
+          path: archive-gazette
+          method: post
+
+  IncomingFromS3:
+    handler: service.incoming_from_s3
+    events:
+      - s3:
+        bucket: lawsafrica-gazettes-incoming
+        event: s3:ObjectCreated:*
+        rules:
+          - prefix: dropbox/
