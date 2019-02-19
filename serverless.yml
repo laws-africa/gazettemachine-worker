@@ -13,6 +13,8 @@ provider:
   region: eu-west-1
   profile: lawsafrica
   stage: production
+  environment:
+    API_AUTH_TOKEN: ${ssm:GazetteMachine-API-auth-token}
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -43,8 +45,6 @@ functions:
       - http:
           path: archive-gazette
           method: post
-    environment:
-      API_AUTH_TOKEN: ${ssm:GazetteMachine-API-auth-token}
 
   IncomingFromS3:
     handler: service.incoming_from_s3
