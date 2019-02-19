@@ -42,7 +42,7 @@ def identify_and_archive(event, context):
 
 def incoming_from_s3(event, context):
     for record in event['Records']:
-        s3_location = '/'.join([record['s3']['bucket']['name'], record['s3']['object']['key']])
+        s3_location = '/'.join([record['s3']['bucket']['name'], record['s3']['object']['key'].replace('+', ' ')])
         info = {'s3_location': s3_location}
         run_task(['--identify', '--info', json.dumps(info)])
 
