@@ -146,7 +146,8 @@ class GazetteMachine:
             if not info.get('jurisdiction'):
                 return False
 
-            identifier = {'na': IdentifierNA}[info['jurisdiction']]()
+            # get identifier class
+            identifier = globals()['Identifier%s' % info['jurisdiction'].upper()]()
 
             self.tmpfile.seek(0, 2)
             info['size'] = self.tmpfile.tell()
