@@ -4,6 +4,9 @@
 
 service: GazetteMachine
 
+plugins:
+  - serverless-plugin-existing-s3
+
 provider:
   name: aws
   runtime: python3.7
@@ -21,6 +24,11 @@ provider:
         - "iam:PassRole"
       Resource:
         - "*"
+    - Effect: "Allow"
+      Action:
+        - "s3:PutBucketNotification"
+      Resource:
+        - "arn:aws:s3:::lawsafrica-gazettes-incoming"
 
 package:
   exclude:
@@ -39,8 +47,9 @@ functions:
   IncomingFromS3:
     handler: service.incoming_from_s3
     events:
-      - s3:
-        bucket: lawsafrica-gazettes-incoming
-        event: s3:ObjectCreated:*
-        rules:
-          - prefix: dropbox/
+      - existingS3:
+          bucket: lawsafrica-gazettes-incoming
+          events:
+            - s3:ObjectCreated:*
+          rules:
+            - prefix: dropbox/
