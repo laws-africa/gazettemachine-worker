@@ -25,6 +25,7 @@ class MetadataStore:
     def __init__(self):
         self.base_url = GM_API_URL
         self.session = requests.Session()
+        log.info("Using auth token %s" % GM_AUTH_TOKEN)
         self.session.headers.update({'Authorization': 'Token %s' % GM_AUTH_TOKEN})
 
     def save_gazette(self, info):

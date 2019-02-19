@@ -13,7 +13,8 @@ def run_task(command):
             'containerOverrides': [{
                 'name': 'GazetteMachineWorker',
                 'command': command,
-            }]
+            }],
+            'taskRoleArn': 'arn:aws:iam::254881051502:role/GazetteMachineTaskRole',
         },
         networkConfiguration={
             'awsvpcConfiguration': {
