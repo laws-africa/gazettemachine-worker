@@ -184,15 +184,14 @@ class GazetteMachine:
         """ OCR the file in f, write it back into f AND to S3, and update
         info to reflect the new file, moving the original into the sources list.
         """
-        key = info['s3_location'].split('/', 1)[1]
-        ocr_key = '{}-ocr.pdf'.format(key)
-        ocr_location = '{}/{}/{}'.format(self.INCOMING_BUCKET, self.TEMP_PATH, ocr_key)
-
         # OCR the file in place
         self.ocr_file(self.tmpfile.name)
-
         self.tmpfile.flush()
         self.tmpfile.seek(0)
+
+        key = info['s3_location'].split('/', 1)[1]
+        ocr_key = '{}{}-ocr.pdf'.format(self.TEMP_PATH, key)
+        ocr_location = '{}/{}'.format(self.INCOMING_BUCKET, ocr_key)
 
         log.info("Uploading OCRd {} to {}".format(info['s3_location'], ocr_location))
 
