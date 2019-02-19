@@ -286,7 +286,7 @@ class GazetteMachine:
 
 
 class IdentifierNA:
-    NA_NUMBER_RE = re.compile(r'^No.\s+(\d+)$', re.MULTILINE)
+    NUMBER_RE = re.compile(r'^No.\s+(\d+)$', re.MULTILINE)
     DATE_RE = re.compile(r'\b\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b')
 
     def identify(self, info, coverpage, f):
@@ -299,7 +299,7 @@ class IdentifierNA:
         info['publication'] = 'Government Gazette'
 
         # number
-        match = self.NA_NUMBER_RE.search(coverpage)
+        match = self.NUMBER_RE.search(coverpage)
         if match:
             info['number'] = match.group(1)
 
@@ -307,6 +307,35 @@ class IdentifierNA:
         match = self.DATE_RE.search(coverpage)
         if match:
             date = datetime.datetime.strptime(match.group(), '%d %B %Y')
+            info['date'] = date.strftime('%Y-%m-%d')
+            info['year'] = str(date.year)
+
+        info['identified'] = bool(info.get('number') and info.get('date'))
+
+
+class IdentifierBW:
+    NUMBER_RE = re.compile(r'\bNo.\s+(\d+)\b', re.MULTILINE)
+    DATE_RE = re.compile(r'\b(\d{1,2})[a-z]{0,2} (January|February|March|April|May|June|July|August|September|October|November|December), (\d{4})\b')
+
+    def identify(self, info, coverpage, f):
+        info['identified'] = False
+
+        if not ('GOVERNMENT GAZETTE' in coverpage and 'BOTSWANA' in coverpage):
+            return False
+
+        info['jurisdiction_name'] = 'Botswana'
+        info['publication'] = 'Government Gazette'
+
+        # number
+        match = self.NUMBER_RE.search(coverpage)
+        if match:
+            info['number'] = match.group(1)
+
+        # date
+        match = self.DATE_RE.search(coverpage)
+        if match:
+            s = " ".join([match.group(1), match.group(2), match.group(3)])
+            date = datetime.datetime.strptime(s, '%d %B %Y')
             info['date'] = date.strftime('%Y-%m-%d')
             info['year'] = str(date.year)
 
