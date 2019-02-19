@@ -206,7 +206,7 @@ class GazetteMachine:
         with tempfile.TemporaryDirectory() as tmpdir:
             # make a multipage tiff of the original PDF
             tiffs = "{}/images.tiff".format(tmpdir)
-            result = subprocess.run(["gs", "-o", tiffs, "-sDEVICE=tiff32nc", "-r300", self.tmpfile.name])
+            result = subprocess.run(["gs", "-o", tiffs, "-sDEVICE=tiff32nc", "-dUseBigTIFF=true", "-r300", self.tmpfile.name])
             result.check_returncode()
 
             # OCR using tesseract to produce a pdf

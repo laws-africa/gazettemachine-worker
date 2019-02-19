@@ -9,6 +9,8 @@ It calls the [Gazette Machine Storage API](https://github.com/laws-africa/gazett
 
 Image at Docker Hub: [lawsafrica/gazettemachine-worker](https://hub.docker.com/r/lawsafrica/gazettemachine-worker)
 
+The `GazetteMachine-API-auth-token` auth token is stored in the AWS SSM Parameter Store.
+
 ## Local development
 
 1. Clone this repo

@@ -1,5 +1,8 @@
 import json
+import os
 import boto3
+
+API_AUTH_TOKEN = os.environ['API_AUTH_TOKEN']
 
 
 def run_task(command):
@@ -26,6 +29,11 @@ def run_task(command):
 
 
 def identify_and_archive(event, context):
+    # check authentication
+    token = event.pop('auth-token', None)
+    if token != API_AUTH_TOKEN:
+        return {'status': 'not authorized'}
+
     run_task(['--identify', '--info', json.dumps(event)])
     return {
         'status': 'processed',
