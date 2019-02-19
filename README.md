@@ -1,8 +1,13 @@
 # Gazette Machine Worker
 
-This is a Docker image that does heavy lifting for Gazette Machine.
+This is two things:
+
+1. a Docker image that does heavy lifting for Gazette Machine
+2. a collection of AWS Lambdas that kick off the Gazette Machine via ECS.
 
 It calls the [Gazette Machine Storage API](https://github.com/laws-africa/gazettemachine) to store metadata.
+
+Image at Docker Hub: [lawsafrica/gazettemachine-worker](https://hub.docker.com/r/lawsafrica/gazettemachine-worker)
 
 ## Local development
 
