@@ -23,4 +23,7 @@ The `GazetteMachine-API-auth-token` auth token is stored in the AWS SSM Paramete
 1. Install serverless and dependencies: `npm install`
 2. Ensure you have AWS credentials setup in `~/.aws/credentials`
 3. Deploy: `serverless deploy`
-4. Ensure S3 triggers are installed: `serverless s3deploy`
+
+This will need to be done if the name of the S3 trigger function changes, or on very first deployment, to create the S3 trigger:
+
+`serverless s3deploy`
