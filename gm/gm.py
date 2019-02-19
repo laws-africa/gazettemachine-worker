@@ -44,6 +44,7 @@ class MetadataStore:
         return resp.json()
 
     def manually_identify(self, info):
+        log.info("Manualy identification: %s" % info)
         resp = self.session.post(self.base_url + '/tasks/', json={
             's3_location': info['s3_location'],
             'jurisdiction': info.get('jurisdiction'),
@@ -108,6 +109,11 @@ class GazetteMachine:
         The provided info may already be identified. If so, it will safely
         be archived.
         """
+        prefix = "{}/{}".format(self.INCOMING_BUCKET, self.DROPBOX_PATH)
+
+        if not info.get('s3_location', '').startswith(prefix):
+            raise ValueError("Expected s3_location to start with '%s' but got '%s'" % (prefix, info.get('s3_location', '')))
+
         with self.fetch(info) as tmp:
             self.tmpfile = tmp
 
@@ -116,8 +122,9 @@ class GazetteMachine:
                 return self.archive(info)
             else:
                 log.info("Gazette {} requires manual identification".format(info['s3_location']))
-                self.manually_identify(info)
-                return False
+                resp = self.manually_identify(info)
+                info['manual_task_url'] = resp['url']
+                return info
 
     def fetch(self, info):
         if 'fname' in info:
@@ -133,9 +140,8 @@ class GazetteMachine:
     def identify(self, info):
         if not info.get('identified'):
             if not info.get('jurisdiction'):
-                if info['s3_location'].startswith(self.INCOMING_BUCKET):
-                    # lawsafrica-incoming/dropbox/na/file
-                    info['jurisdiction'] = info['s3_location'].split('/', 3)[2]
+                # lawsafrica-incoming/dropbox/na/file
+                info['jurisdiction'] = info['s3_location'].split('/', 3)[2]
 
             if not info.get('jurisdiction'):
                 return False

@@ -5,8 +5,18 @@ from gm.gm import GazetteMachine
 
 
 def identify_and_archive(event, context):
-    gm = GazetteMachine()
-    return gm.identify_and_archive(event)
+    try:
+        gm = GazetteMachine()
+        info = gm.identify_and_archive(event)
+    except ValueError as e:
+        return {
+            'status': 'error',
+            'message': str(e),
+        }
+    return {
+        'status': 'accepted',
+        'info': info,
+    }
 
 
 def incoming_from_s3(event, context):
