@@ -1,5 +1,7 @@
 # Gazette Machine Worker
 
+[![Build Status](https://travis-ci.org/laws-africa/gazettemachine-worker.svg)](http://travis-ci.org/laws-africa/gazettemachine-worker)
+
 This is two things:
 
 1. a Docker image that does heavy lifting for Gazette Machine
