@@ -10,6 +10,17 @@ provider:
   region: eu-west-1
   profile: lawsafrica
   stage: production
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "ecs:RunTask"
+      Resource:
+        - "arn:aws:ecs:eu-west-1:254881051502:task-definition/*"
+    - Effect: "Allow"
+      Action:
+        - "iam:PassRole"
+      Resource:
+        - "*"
 
 package:
   exclude:

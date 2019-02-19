@@ -7,11 +7,20 @@ def run_task(command):
     return ecs.run_task(
         cluster='default',
         taskDefinition='identify-gazette',
-        overrides={
-            'containerOverrides': [{'command': command}]
-        },
         startedBy='lambda',
         launchType='FARGATE',
+        overrides={
+            'containerOverrides': [{
+                'name': 'GazetteMachineWorker',
+                'command': command,
+            }]
+        },
+        networkConfiguration={
+            'awsvpcConfiguration': {
+                'subnets': ['subnet-0021aa9617f6ddcac', 'subnet-0f5d0adbb8cfd8baf'],
+                'assignPublicIp': 'ENABLED',
+            }
+        },
     )
 
 
