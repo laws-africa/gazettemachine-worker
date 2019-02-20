@@ -29,18 +29,21 @@ def run_task(command):
 
 
 def identify_and_archive(event, context):
+    """ API Gateway call.
+    """
     # check authentication
     token = event.pop('auth-token', None)
     if token != API_AUTH_TOKEN:
-        return {'status': 'not authorized'}
+        return {'statusCode': 403}
 
     run_task(['--identify', '--info', json.dumps(event)])
-    return {
-        'status': 'processed',
-    }
+
+    return {'statusCode': 200}
 
 
 def incoming_from_s3(event, context):
+    """ S3 event.
+    """
     for record in event['Records']:
         s3_location = '/'.join([record['s3']['bucket']['name'], record['s3']['object']['key'].replace('+', ' ')])
         info = {'s3_location': s3_location}
