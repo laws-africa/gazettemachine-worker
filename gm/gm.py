@@ -4,6 +4,9 @@ import subprocess
 import re
 import logging
 import os
+from urllib.parse import urlparse
+import random
+import string
 
 import boto3
 import requests
@@ -13,6 +16,8 @@ log = logging.getLogger(__name__)
 
 GM_API_URL = os.environ.get('GM_API_URL', 'https://api.gazettes.laws.africa/v1')
 GM_AUTH_TOKEN = os.environ.get('GM_AUTH_TOKEN')
+
+TIMEOUT = 30
 
 
 class RequiresOCR(Exception):
@@ -29,7 +34,7 @@ class MetadataStore:
 
     def save_gazette(self, info):
         log.info("Saving gazette: %s" % info)
-        resp = self.session.post(self.base_url + '/gazettes/', json=info)
+        resp = self.session.post(self.base_url + '/gazettes/', json=info, timeout=TIMEOUT)
 
         # already exists?
         if resp.status_code == 400 and "gazette with this key already exists." in resp.json().get('key', []):
@@ -52,7 +57,7 @@ class MetadataStore:
             'publication': info.get('publication'),
             'number': info.get('number'),
             'name': info.get('name'),
-        })
+        }, timeout=TIMEOUT)
 
         if resp.status_code == 400:
             log.info(resp.text)
@@ -61,26 +66,35 @@ class MetadataStore:
         log.info("Responded %s" % resp.status_code)
         return resp.json()
 
+    def filter_urls(self, urls):
+        """ Ask the store which URLs we should care about.
+        """
+        resp = self.session.post(self.base_url + '/filter-urls', json={'urls': urls}, timeout=TIMEOUT)
+        resp.raise_for_status()
+        log.info("Responded %s" % resp.status_code)
+        return resp.json()['urls']
+
 
 class GazetteMachine:
     """ Magic for identifying and archiving gazettes.
 
-    1. OCR if necessary
-    2. Get coverpage text
-    3. Attempt to identify.
-    4. If succesful,
-       4a. archive primary material into S3
-       4b. archive source materials into S3 (if different to primary)
-       4c. save info to database
-       4d. trigger workflows
-    5. If unsuccessful,
-       5a. save info to database
+    1. If it's not in S3, download from a given URL and put it into a temporary S3 bucket.
+    2. OCR if necessary
+    3. Get coverpage text
+    4. Attempt to identify.
+    5. If succesful,
+       5a. archive primary material into S3
+       5b. archive source materials into S3 (if different to primary)
+       5c. save info to database
+    6. If unsuccessful,
+       6a. save info to database
 
 
     In general, +info+ is a dictionary with these keys
 
       jurisdiction: two letter country code (eg. "na") or jurisdiction such as ("za-gp")
       identified: successfully identified?
+      source_url: URL to download from, if not in S3 (see s3_location)
       s3_location: S3 details as one string, "bucket/key"
       sources: [s3_location, s3_location, ...]
       date: "YYYY-MM-DD"
@@ -109,11 +123,6 @@ class GazetteMachine:
         The provided info may already be identified. If so, it will safely
         be archived.
         """
-        prefix = "{}/{}".format(self.INCOMING_BUCKET, self.DROPBOX_PATH)
-
-        if not info.get('s3_location', '').startswith(prefix):
-            raise ValueError("Expected s3_location to start with '%s' but got '%s'" % (prefix, info.get('s3_location', '')))
-
         with self.fetch(info) as tmp:
             self.tmpfile = tmp
 
@@ -130,12 +139,38 @@ class GazetteMachine:
         if 'fname' in info:
             return open(info['fname'], 'r+b')
 
-        log.info("Dowloading {} from S3".format(info['s3_location']))
+        if 'source_url' in info:
+            # download from a URL and upload into S3, so we have the original source if we OCR it
+            log.info("Uploading file from {}".format(info['source_url']))
+            with requests.get(info['source_url'], timeout=TIMEOUT, stream=True) as resp:
+                resp.raise_for_status()
 
-        tmp = tempfile.NamedTemporaryFile()
-        bucket, key = info['s3_location'].split('/', 1)
-        self.s3.download_fileobj(bucket, key, tmp)
-        return tmp
+                tmp = tempfile.NamedTemporaryFile()
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        tmp.write(chunk)
+
+            # upload to s3
+            tmp.seek(0)
+            dest = "{}{}/{}".format(self.TEMP_PATH, info['jurisdiction'], self.key_from_url(info['source_url']))
+            info['s3_location'] = '{}/{}'.format(self.INCOMING_BUCKET, dest)
+            log.info("Uploading file from {} to {}".format(info['source_url'], info['s3_location']))
+            self.s3.upload_fileobj(tmp, self.INCOMING_BUCKET, dest)
+            return tmp
+
+        if 's3_location' in info:
+            prefix = "{}/{}".format(self.INCOMING_BUCKET, self.DROPBOX_PATH)
+            if not info.get('s3_location', '').startswith(prefix):
+                raise ValueError("Expected s3_location to start with '%s' but got '%s'" % (prefix, info.get('s3_location', '')))
+
+            log.info("Dowloading {} from S3".format(info['s3_location']))
+
+            tmp = tempfile.NamedTemporaryFile()
+            bucket, key = info['s3_location'].split('/', 1)
+            self.s3.download_fileobj(bucket, key, tmp)
+            return tmp
+
+        log.error("No source to work with :(")
 
     def identify(self, info):
         if not info.get('identified'):
@@ -160,6 +195,7 @@ class GazetteMachine:
                 try:
                     coverpage = self.get_coverpage_text()
                 except RequiresOCR:
+                    log.error("Already OCRd file still needs OCR")
                     return False
 
             identifier.identify(info, coverpage, self.tmpfile)
@@ -193,9 +229,7 @@ class GazetteMachine:
         ocr_key = '{}{}-ocr.pdf'.format(self.TEMP_PATH, key)
         ocr_location = '{}/{}'.format(self.INCOMING_BUCKET, ocr_key)
 
-        log.info("Uploading OCRd {} to {}".format(info['s3_location'], ocr_location))
-
-        # copy OCRd file to s3
+        log.info("Uploading OCRd file to {}".format(ocr_location))
         self.s3.put_object(Bucket=self.INCOMING_BUCKET, Key=ocr_key, Body=self.tmpfile)
 
         info.setdefault('sources', []).append(info['s3_location'])
@@ -232,7 +266,6 @@ class GazetteMachine:
         if saved is not False:
             # copy to archival S3 bucket
             log.info("Copying primary {} to {}/{}".format(info['s3_location'], self.ARCHIVE_BUCKET, dest))
-
             self.s3.copy_object(
                 CopySource=info['s3_location'],
                 Bucket=self.ARCHIVE_BUCKET,
@@ -283,6 +316,11 @@ class GazetteMachine:
             raise RequiresOCR()
 
         return coverpage
+
+    def s3_key_from_url(self, url):
+        key = os.path.split(urlparse(url).path)
+        key = key or ''.join(random.choices(string.ascii_uppercase, k=10))
+        return key
 
 
 class IdentifierNA:
