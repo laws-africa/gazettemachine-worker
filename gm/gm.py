@@ -56,7 +56,7 @@ class MetadataStore:
             'date': info.get('date'),
             'publication': info.get('publication'),
             'number': info.get('number'),
-            'name': info.get('name'),
+            'info': info,
         }, timeout=TIMEOUT)
 
         if resp.status_code == 400:
