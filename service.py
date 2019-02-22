@@ -10,7 +10,8 @@ API_AUTH_TOKEN = os.environ['API_AUTH_TOKEN']
 
 def run_task(command):
     ecs = boto3.client('ecs')
-    return ecs.run_task(
+    print("Running ECS task: %s" % command)
+    resp = ecs.run_task(
         cluster='default',
         taskDefinition='identify-gazette',
         startedBy='lambda',
@@ -29,6 +30,8 @@ def run_task(command):
             }
         },
     )
+    print("run_task response: %s" % resp)
+    return resp
 
 
 def identify_and_archive(event, context):
@@ -56,6 +59,9 @@ def incoming_from_s3(event, context):
 
         elif key.endswith('.csv'):
             csv_from_s3(bucket, key)
+
+        else:
+            print("Ignored: %s" % key)
 
     return {
         'status': 'processed',
