@@ -6,6 +6,7 @@ service: GazetteMachine
 
 plugins:
   - serverless-plugin-existing-s3
+  - serverless-python-requirements
 
 provider:
   name: aws
@@ -37,6 +38,8 @@ package:
     - "./**"
   include:
     - service.py
+    - gm/__init__.py
+    - gm/gm.py
 
 functions:
   ArchiveGazette:
