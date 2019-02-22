@@ -123,6 +123,8 @@ class GazetteMachine:
         The provided info may already be identified. If so, it will safely
         be archived.
         """
+        log.info("Identify and archive: %s" % info)
+
         with self.fetch(info) as tmp:
             self.tmpfile = tmp
 

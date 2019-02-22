@@ -37,12 +37,14 @@ def run_task(command):
 def identify_and_archive(event, context):
     """ API Gateway call.
     """
+    info = json.loads(event.get('body'))
+
     # check authentication
-    token = event.pop('auth-token', None)
+    token = info.pop('auth-token', None)
     if token != API_AUTH_TOKEN:
         return {'statusCode': 403}
 
-    run_task(['--identify', '--info', json.dumps(event)])
+    run_task(['--identify', '--info', json.dumps(info)])
 
     return {'statusCode': 200}
 
