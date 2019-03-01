@@ -3,50 +3,10 @@ import json
 import os
 import boto3
 import csv
-import gm
+import requests
 
 API_AUTH_TOKEN = os.environ['API_AUTH_TOKEN']
-
-
-def run_task(command):
-    ecs = boto3.client('ecs')
-    print("Running ECS task: %s" % command)
-    resp = ecs.run_task(
-        cluster='default',
-        taskDefinition='identify-gazette',
-        startedBy='lambda',
-        launchType='FARGATE',
-        overrides={
-            'containerOverrides': [{
-                'name': 'GazetteMachineWorker',
-                'command': command,
-            }],
-            'taskRoleArn': 'arn:aws:iam::254881051502:role/GazetteMachineTaskRole',
-        },
-        networkConfiguration={
-            'awsvpcConfiguration': {
-                'subnets': ['subnet-0021aa9617f6ddcac', 'subnet-0f5d0adbb8cfd8baf'],
-                'assignPublicIp': 'ENABLED',
-            }
-        },
-    )
-    print("run_task response: %s" % resp)
-    return resp
-
-
-def identify_and_archive(event, context):
-    """ API Gateway call.
-    """
-    info = json.loads(event.get('body'))
-
-    # check authentication
-    token = info.pop('auth-token', None)
-    if token != API_AUTH_TOKEN:
-        return {'statusCode': 403}
-
-    run_task(['--identify', '--info', json.dumps(info)])
-
-    return {'statusCode': 200}
+API_URL = os.environ.get('API_URL', 'https://api.gazettes.laws.africa/v1')
 
 
 def incoming_from_s3(event, context):
@@ -57,7 +17,11 @@ def incoming_from_s3(event, context):
         key = record['s3']['object']['key'].replace('+', ' ')
 
         if key.endswith('.pdf'):
-            pdf_from_s3({'s3_location': '/'.join([bucket, key])})
+            info = {
+                's3_location': '/'.join([bucket, key]),
+                'jurisdiction': key.split('/')[0],
+            }
+            pdf_from_s3(info)
 
         elif key.endswith('.csv'):
             csv_from_s3(bucket, key)
@@ -65,13 +29,12 @@ def incoming_from_s3(event, context):
         else:
             print("Ignored: %s" % key)
 
-    return {
-        'status': 'processed',
-    }
-
 
 def pdf_from_s3(info):
-    run_task(['--identify', '--info', json.dumps(info)])
+    headers = {'Authorization': 'Token %s' % API_AUTH_TOKEN}
+    resp = requests.put(API_URL + '/gazettes/pending', json=info, headers=headers)
+    print("Result from GM: %s" % resp.text)
+    resp.raise_for_status()
 
 
 def csv_from_s3(bucket, key):
@@ -79,7 +42,6 @@ def csv_from_s3(bucket, key):
     Each entry should have a 'jurisdiction' and 'url' column.
     """
     s3 = boto3.client('s3')
-    metadata = gm.MetadataStore()
 
     with tempfile.TemporaryFile() as f:
         s3.download_fileobj(bucket, key, f)

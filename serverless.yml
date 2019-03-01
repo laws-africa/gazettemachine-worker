@@ -19,16 +19,6 @@ provider:
   iamRoleStatements:
     - Effect: "Allow"
       Action:
-        - "ecs:RunTask"
-      Resource:
-        - "arn:aws:ecs:eu-west-1:254881051502:task-definition/*"
-    - Effect: "Allow"
-      Action:
-        - "iam:PassRole"
-      Resource:
-        - "*"
-    - Effect: "Allow"
-      Action:
         - "s3:PutBucketNotification"
       Resource:
         - "arn:aws:s3:::lawsafrica-gazettes-incoming"
@@ -38,17 +28,8 @@ package:
     - "./**"
   include:
     - service.py
-    - gm/__init__.py
-    - gm/gm.py
 
 functions:
-  ArchiveGazette:
-    handler: service.identify_and_archive
-    events:
-      - http:
-          path: archive-gazette
-          method: post
-
   IncomingFromS3:
     handler: service.incoming_from_s3
     events:
