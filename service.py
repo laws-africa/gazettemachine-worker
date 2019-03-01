@@ -51,28 +51,31 @@ def csv_from_s3(bucket, key):
     """
     s3 = boto3.client('s3')
 
-    with tempfile.TemporaryFile() as f:
+    with tempfile.TemporaryFile('w+b') as f:
         s3.download_fileobj(bucket, key, f)
         f.seek(0)
-        reader = csv.DictReader(f)
+        text = f.read()
 
-        # filter out the URLs we've already processed
-        rows = list(reader)
-        urls = [r['url'] for r in rows if r.get('url') and r.get('jurisdiction')]
+    reader = csv.DictReader(text.decode('utf-8').split("\n"))
 
-        resp = session.post(API_URL + '/filter-urls', json={'urls': urls}, timeout=TIMEOUT)
-        resp.raise_for_status()
-        print("Responded %s" % resp.status_code)
-        urls = set(resp.json()['urls'])
-        print("URLs to process: %s" % urls)
+    # filter out the URLs we've already processed
+    rows = list(reader)
+    urls = [r['url'] for r in rows if r.get('url') and r.get('jurisdiction')]
 
-        for row in rows:
-            if row['url'] in urls:
-                info = {
-                    'jurisdiction': row['jurisdiction'],
-                    'source_url': row['url'],
-                }
-                print("Calling GM: %s" % info)
-                resp = session.post(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
-                print("Result from GM %s: %s" % (resp.status_code, resp.text))
-                resp.raise_for_status()
+    print("Filtering URLs: %s" % urls)
+    resp = session.post(API_URL + '/filter-urls', json={'urls': urls}, timeout=TIMEOUT)
+    resp.raise_for_status()
+    print("Responded %s" % resp.status_code)
+    urls = set(resp.json()['urls'])
+    print("URLs to process: %s" % urls)
+
+    for row in rows:
+        if row.get('url') in urls:
+            info = {
+                'jurisdiction': row['jurisdiction'],
+                'source_url': row['url'],
+            }
+            print("Calling GM: %s" % info)
+            resp = session.post(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
+            print("Result from GM %s: %s" % (resp.status_code, resp.text))
+            resp.raise_for_status()

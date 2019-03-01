@@ -22,6 +22,12 @@ provider:
         - "s3:PutBucketNotification"
       Resource:
         - "arn:aws:s3:::lawsafrica-gazettes-incoming"
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        - "arn:aws:s3:::lawsafrica-gazettes-incoming"
+        - "arn:aws:s3:::lawsafrica-gazettes-incoming/*"
 
 package:
   exclude:
