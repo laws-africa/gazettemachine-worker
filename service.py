@@ -1,5 +1,4 @@
 import tempfile
-import json
 import os
 import boto3
 import csv
@@ -7,6 +6,10 @@ import requests
 
 API_AUTH_TOKEN = os.environ['API_AUTH_TOKEN']
 API_URL = os.environ.get('API_URL', 'https://api.gazettes.laws.africa/v1')
+TIMEOUT = 30
+
+session = requests.Session()
+session.headers.update({'Authorization': 'Token %s' % API_AUTH_TOKEN})
 
 
 def incoming_from_s3(event, context):
@@ -31,9 +34,9 @@ def incoming_from_s3(event, context):
 
 
 def pdf_from_s3(info):
-    headers = {'Authorization': 'Token %s' % API_AUTH_TOKEN}
-    resp = requests.put(API_URL + '/gazettes/pending', json=info, headers=headers)
-    print("Result from GM: %s" % resp.text)
+    print("Calling GM: %s" % info)
+    resp = session.put(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
+    print("Result from GM %s: %s" % (resp.status_code, resp.text))
     resp.raise_for_status()
 
 
@@ -51,7 +54,12 @@ def csv_from_s3(bucket, key):
         # filter out the URLs we've already processed
         rows = list(reader)
         urls = [r['url'] for r in rows if r.get('url') and r.get('jurisdiction')]
-        urls = set(metadata.filter_urls(urls))
+
+        resp = session.post(API_URL + '/filter-urls', json={'urls': urls}, timeout=TIMEOUT)
+        resp.raise_for_status()
+        print("Responded %s" % resp.status_code)
+        urls = set(resp.json()['urls'])
+        print("URLs to process: %s" % urls)
 
         for row in rows:
             if row['url'] in urls:
@@ -59,4 +67,7 @@ def csv_from_s3(bucket, key):
                     'jurisdiction': row['jurisdiction'],
                     'source_url': row['url'],
                 }
-                run_task(['--identify', '--info', json.dumps(info)])
+                print("Calling GM: %s" % info)
+                resp = session.post(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
+                print("Result from GM %s: %s" % (resp.status_code, resp.text))
+                resp.raise_for_status()
