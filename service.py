@@ -20,22 +20,27 @@ def incoming_from_s3(event, context):
         key = record['s3']['object']['key'].replace('+', ' ')
 
         if key.endswith('.pdf'):
-            info = {
-                's3_location': '/'.join([bucket, key]),
-                'jurisdiction': key.split('/')[0],
-            }
-            pdf_from_s3(info)
+            # dropbox/bw/foo.pdf
+            # dropbox/bw/foo/bar.pdf
+            parts = key.split("/")
+            if len(parts) >= 3 and parts[0] == 'dropbox':
+                info = {
+                    's3_location': '/'.join([bucket, key]),
+                    'jurisdiction': parts[1],
+                }
+                pdf_from_s3(info)
+                return
 
         elif key.endswith('.csv'):
             csv_from_s3(bucket, key)
+            return
 
-        else:
-            print("Ignored: %s" % key)
+        print("Ignored: %s" % key)
 
 
 def pdf_from_s3(info):
     print("Calling GM: %s" % info)
-    resp = session.put(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
+    resp = session.post(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
     print("Result from GM %s: %s" % (resp.status_code, resp.text))
     resp.raise_for_status()
 
