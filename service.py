@@ -57,25 +57,16 @@ def csv_from_s3(bucket, key):
         text = f.read()
 
     reader = csv.DictReader(text.decode('utf-8').split("\n"))
-
-    # filter out the URLs we've already processed
     rows = list(reader)
-    urls = [r['url'] for r in rows if r.get('url') and r.get('jurisdiction')]
 
-    print("Filtering URLs: %s" % urls)
-    resp = session.post(API_URL + '/filter-urls', json={'urls': urls}, timeout=TIMEOUT)
+    data = {'items': [{
+        'jurisdiction': r['jurisdiction'],
+        'source_url': r['url'],
+    } for r in rows if r.get('jurisdiction') and r.get('url')]}
+
+    print("Calling GM: %s" % data)
+    resp = session.post(API_URL + '/gazettes/pending/bulk/', json=data, timeout=TIMEOUT)
+    print("Result from GM %s: %s" % (resp.status_code, resp.text))
     resp.raise_for_status()
-    print("Responded %s" % resp.status_code)
-    urls = set(resp.json()['urls'])
-    print("URLs to process: %s" % urls)
 
-    for row in rows:
-        if row.get('url') in urls:
-            info = {
-                'jurisdiction': row['jurisdiction'],
-                'source_url': row['url'],
-            }
-            print("Calling GM: %s" % info)
-            resp = session.post(API_URL + '/gazettes/pending/', json=info, timeout=TIMEOUT)
-            print("Result from GM %s: %s" % (resp.status_code, resp.text))
-            resp.raise_for_status()
+    s3.delete_object(bucket, key)
