@@ -9,9 +9,8 @@ import requests
 
 log = logging.getLogger(__name__)
 
-#GM_API_URL = os.environ.get('GM_API_URL', 'https://api.gazettes.laws.africa')
-GM_API_URL = os.environ.get('GM_API_URL', 'http://api.local.debug:9999')
-GM_AUTH_TOKEN = os.environ.get('GM_AUTH_TOKEN', '7e1c9d612a912e6661f81000a0f985e9a4c257da')
+GM_API_URL = os.environ.get('GM_API_URL', 'https://api.gazettes.laws.africa')
+GM_AUTH_TOKEN = os.environ.get('GM_AUTH_TOKEN')
 
 TIMEOUT = 30
 
