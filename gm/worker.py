@@ -73,7 +73,9 @@ class Worker:
         log.info("Uploading OCRd file to {}".format(ocr_location))
         self.s3.put_object(Bucket=self.INCOMING_BUCKET, Key=ocr_key, Body=self.tmpfile)
 
-        info.setdefault('sources', []).append(info['s3_location'])
+        if not info.get('sources'):
+            info['sources'] = []
+        info['sources'].append(info['s3_location'])
         info['s3_location'] = ocr_location
         info['ocrd'] = True
         info['coverpage_text'] = None
