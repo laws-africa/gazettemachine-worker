@@ -69,4 +69,4 @@ def csv_from_s3(bucket, key):
     print("Result from GM %s: %s" % (resp.status_code, resp.text))
     resp.raise_for_status()
 
-    s3.delete_object(bucket, key)
+    s3.delete_object(Bucket=bucket, Key=key)
