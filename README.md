@@ -1,13 +1,9 @@
 # Gazette Machine Worker
 
-[![Build Status](https://travis-ci.org/laws-africa/gazettemachine-worker.svg)](http://travis-ci.org/laws-africa/gazettemachine-worker)
-
 This is two things:
 
-1. a Docker image that does heavy lifting for Gazette Machine
-2. a collection of AWS Lambdas that kick off the Gazette Machine via ECS.
-
-It calls the [Gazette Machine Storage API](https://github.com/laws-africa/gazettemachine) to store metadata.
+1. a Docker image that does heavy lifting for Gazette Machine, run as an ECS task.
+2. a collection of AWS Lambdas that call out to the [Gazette Machine API](https://github.com/laws-africa/gazettemachine-api).
 
 Image at Docker Hub: [lawsafrica/gazettemachine-worker](https://hub.docker.com/r/lawsafrica/gazettemachine-worker)
 
