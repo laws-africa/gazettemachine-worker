@@ -100,6 +100,7 @@ class Worker:
     def update_gm(self, info, url):
         log.info("Updating GM {}: {}".format(url, info))
         resp = requests.put(url, timeout=TIMEOUT, json=info, headers=self.headers)
+        log.info("Response: %s" % resp.text)
         resp.raise_for_status()
 
         info = resp.json()
