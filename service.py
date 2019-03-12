@@ -19,7 +19,7 @@ def incoming_from_s3(event, context):
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key'].replace('+', ' ')
 
-        if key.endswith('.pdf'):
+        if key.lower().endswith('.pdf'):
             # dropbox/bw/foo.pdf
             # dropbox/bw/foo/bar.pdf
             parts = key.split("/")
@@ -31,7 +31,7 @@ def incoming_from_s3(event, context):
                 pdf_from_s3(info)
                 return
 
-        elif key.endswith('.csv'):
+        elif key.lower().endswith('.csv'):
             csv_from_s3(bucket, key)
             return
 
