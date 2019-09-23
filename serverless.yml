@@ -60,6 +60,12 @@ functions:
         bucket: lawsafrica-gazettes-archive
         events:
           - s3:ObjectCreated:*
+        rules:
+          - prefix: archive/
+        existing: true
+      - s3:
+        bucket: lawsafrica-gazettes-archive
+        events:
           - s3:ObjectRemoved:*
         rules:
           - prefix: archive/

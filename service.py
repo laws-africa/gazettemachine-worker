@@ -75,14 +75,31 @@ def csv_from_s3(bucket, key):
 def archived_gazette_changed(event, context):
     """ S3 event. Archived gazette has been created or deleted.
     """
+    # TODO: appropriate creds and permissions
+    s3 = boto3.client('s3')
+    tgt_bucket = "lawsafrica-gazettes-archive"
+
     for record in event['Records']:
-        print("Got record: {}".format(record))
+        print("Got S3 event record: {}".format(record))
 
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key'].replace('+', ' ')
+        if not key.startswith('archive/'):
+            continue
+        tgt_key = "test-output/" + key[8:]
 
-        if key.lower().endswith('.pdf'):
-            print("Bucket: {}, key: {}".format(bucket, key))
-            return
+        print("Bucket: {}, Key: {}".format(bucket, key))
 
-        print("Ignored: %s" % key)
+        if record['eventName'].startswith('ObjectRemoved'):
+            print("Deleting bucket: {}, key: {}".format(tgt_bucket, tgt_key))
+            s3.delete_object(Bucket=bucket, Key=key)
+
+        if record['eventName'].startswith('ObjectCreated'):
+            print("Copying to bucket: {}, key: {}".format(tgt_bucket, tgt_key))
+            s3.copy_object(
+                Bucket=tgt_bucket,
+                Key=tgt_key,
+                CopySource={
+                    'Bucket': bucket,
+                    'Key': key,
+                })
