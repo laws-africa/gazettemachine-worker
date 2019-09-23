@@ -5,7 +5,6 @@
 service: GazetteMachine
 
 plugins:
-  - serverless-plugin-existing-s3
   - serverless-python-requirements
 
 provider:
@@ -22,6 +21,7 @@ provider:
         - "s3:PutBucketNotification"
       Resource:
         - "arn:aws:s3:::lawsafrica-gazettes-incoming"
+        - "arn:aws:s3:::lawsafrica-gazettes-archive"
     - Effect: "Allow"
       Action:
         - "s3:GetObject"
@@ -29,6 +29,12 @@ provider:
       Resource:
         - "arn:aws:s3:::lawsafrica-gazettes-incoming"
         - "arn:aws:s3:::lawsafrica-gazettes-incoming/*"
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        - "arn:aws:s3:::lawsafrica-gazettes-archive"
+        - "arn:aws:s3:::lawsafrica-gazettes-archive/*"
 
 package:
   exclude:
@@ -40,9 +46,21 @@ functions:
   IncomingFromS3:
     handler: service.incoming_from_s3
     events:
-      - existingS3:
-          bucket: lawsafrica-gazettes-incoming
-          events:
-            - s3:ObjectCreated:*
-          rules:
-            - prefix: dropbox/
+      - s3:
+        bucket: lawsafrica-gazettes-incoming
+        existing: true
+        events:
+          - s3:ObjectCreated:*
+        rules:
+          - prefix: dropbox/
+  ArchivedGazetteChanged:
+    handler: service.archived_gazette_changed
+    events:
+      - s3:
+        bucket: lawsafrica-gazettes-archive
+        events:
+          - s3:ObjectCreated:*
+          - s3:ObjectRemoved:*
+        rules:
+          - prefix: archive/
+        existing: true

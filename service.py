@@ -70,3 +70,19 @@ def csv_from_s3(bucket, key):
     resp.raise_for_status()
 
     s3.delete_object(Bucket=bucket, Key=key)
+
+
+def archived_gazette_changed(event, context):
+    """ S3 event. Archived gazette has been created or deleted.
+    """
+    for record in event['Records']:
+        print("Got record: {}".format(record))
+
+        bucket = record['s3']['bucket']['name']
+        key = record['s3']['object']['key'].replace('+', ' ')
+
+        if key.lower().endswith('.pdf'):
+            print("Bucket: {}, key: {}".format(bucket, key))
+            return
+
+        print("Ignored: %s" % key)
