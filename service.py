@@ -78,7 +78,7 @@ def archived_gazette_changed(event, context):
     """ S3 event. Archived gazette has been created or deleted.
     """
     s3 = boto3.client('s3')
-    prefix = 'test/'
+    prefix = 'archive/'
 
     for record in event['Records']:
         print("Got S3 event record: {}".format(record))
