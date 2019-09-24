@@ -1,6 +1,7 @@
 import tempfile
 import os
 import boto3
+import botocore
 import csv
 import requests
 
@@ -95,7 +96,13 @@ def archived_gazette_changed(event, context):
 
             if record['eventName'].startswith('ObjectRemoved'):
                 print("Deleting bucket: {}, key: {}".format(tgt_bucket, tgt_key))
-                s3_tgt.delete_object(Bucket=bucket, Key=key)
+                try:
+                    s3_tgt.delete_object(Bucket=bucket, Key=key)
+                except botocore.exceptions.ClientError as e:
+                    if e.response['Error']['Code'] == '403':
+                        print("Ignoring: {}".format(e))
+                    else:
+                        raise e
 
             if record['eventName'].startswith('ObjectCreated'):
                 print("Copying to bucket: {}, key: {}".format(tgt_bucket, tgt_key))
