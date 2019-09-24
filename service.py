@@ -76,6 +76,7 @@ def csv_from_s3(bucket, key):
 def archived_gazette_changed(event, context):
     """ S3 event. Archived gazette has been created or deleted.
     """
+    s3 = boto3.client('s3')
 
     for record in event['Records']:
         print("Got S3 event record: {}".format(record))
@@ -86,21 +87,21 @@ def archived_gazette_changed(event, context):
             continue
 
         for access_key, secret_key, tgt_bucket, tgt_prefix in get_mirror_targets():
-            s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+            s3_tgt = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
             tgt_key = tgt_prefix + key[8:]
 
             print("Mirror from bucket: {}, key: {} to bucket: {}, key: {}".format(bucket, key, tgt_bucket, tgt_key))
 
             if record['eventName'].startswith('ObjectRemoved'):
                 print("Deleting bucket: {}, key: {}".format(tgt_bucket, tgt_key))
-                s3.delete_object(Bucket=bucket, Key=key)
+                s3_tgt.delete_object(Bucket=bucket, Key=key)
 
             if record['eventName'].startswith('ObjectCreated'):
                 print("Copying to bucket: {}, key: {}".format(tgt_bucket, tgt_key))
                 with tempfile.TemporaryFile() as f:
                     s3.download_fileobj(bucket, key, f)
                     f.seek(0)
-                    s3.upload_fileobj(f, tgt_bucket, tgt_key)
+                    s3_tgt.upload_fileobj(f, tgt_bucket, tgt_key)
 
 
 def get_mirror_targets():
