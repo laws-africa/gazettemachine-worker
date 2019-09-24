@@ -15,6 +15,7 @@ provider:
   stage: production
   environment:
     API_AUTH_TOKEN: ${ssm:GazetteMachine-API-auth-token}
+    MIRROR_TARGETS: ${ssm:GazetteMachine-mirror-targets}
   iamRoleStatements:
     - Effect: "Allow"
       Action:
