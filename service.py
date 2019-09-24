@@ -77,18 +77,19 @@ def archived_gazette_changed(event, context):
     """ S3 event. Archived gazette has been created or deleted.
     """
     s3 = boto3.client('s3')
+    prefix = 'test/'
 
     for record in event['Records']:
         print("Got S3 event record: {}".format(record))
 
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key'].replace('+', ' ')
-        if not key.startswith('test/'):
+        if not key.startswith(prefix):
             continue
 
         for access_key, secret_key, tgt_bucket, tgt_prefix in get_mirror_targets():
             s3_tgt = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
-            tgt_key = tgt_prefix + key[8:]
+            tgt_key = tgt_prefix + key[len(prefix):]
 
             print("Mirror from bucket: {}, key: {} to bucket: {}, key: {}".format(bucket, key, tgt_bucket, tgt_key))
 
