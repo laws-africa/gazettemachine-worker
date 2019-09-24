@@ -99,7 +99,7 @@ def archived_gazette_changed(event, context):
                 try:
                     s3_tgt.delete_object(Bucket=bucket, Key=key)
                 except botocore.exceptions.ClientError as e:
-                    if e.response['Error']['Code'] == '403':
+                    if e.response['Error']['Code'] == 'AccessDenied':
                         print("Ignoring: {}".format(e))
                     else:
                         raise e
