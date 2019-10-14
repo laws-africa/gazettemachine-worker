@@ -26,9 +26,10 @@ def incoming_from_s3(event, context):
             # dropbox/bw/foo/bar.pdf
             parts = key.split("/")
             if len(parts) >= 3 and parts[0] == 'dropbox':
+                juri = parts[1].split(' ')[0].lower()
                 info = {
                     's3_location': '/'.join([bucket, key]),
-                    'jurisdiction': parts[1],
+                    'jurisdiction': juri,
                 }
                 pdf_from_s3(info)
                 return
