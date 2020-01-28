@@ -64,7 +64,7 @@ def csv_from_s3(bucket, key):
 
     data = {'items': [{
         'jurisdiction': r['jurisdiction'],
-        'source_url': r['url'],
+        'source_url': r['url'].replace(' ', '%20'),
     } for r in rows if r.get('jurisdiction') and r.get('url')]}
 
     print("Calling GM: %s" % data)
