@@ -7,7 +7,8 @@ This is two things:
 
 Image at Docker Hub: [lawsafrica/gazettemachine-worker](https://hub.docker.com/r/lawsafrica/gazettemachine-worker)
 
-The `GazetteMachine-API-auth-token` auth token is stored in the AWS SSM Parameter Store.
+The `GazetteMachine-API-auth-token` auth token is stored in the AWS SSM Parameter Store. If this token is changed,
+the AWS Lambda function must be redeployed (see Deployment section below) so that it picks up the new token.
 
 ## Local development
 
