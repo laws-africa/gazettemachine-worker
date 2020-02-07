@@ -46,6 +46,7 @@ package:
 functions:
   IncomingFromS3:
     handler: service.incoming_from_s3
+    timeout: 30
     events:
       - s3:
         bucket: lawsafrica-gazettes-incoming
@@ -56,6 +57,7 @@ functions:
           - prefix: dropbox/
   ArchivedGazetteChanged:
     handler: service.archived_gazette_changed
+    timeout: 30
     events:
       - s3:
         bucket: lawsafrica-gazettes-archive
