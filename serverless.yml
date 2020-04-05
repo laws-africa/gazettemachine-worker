@@ -36,6 +36,8 @@ provider:
       Resource:
         - "arn:aws:s3:::lawsafrica-gazettes-archive"
         - "arn:aws:s3:::lawsafrica-gazettes-archive/*"
+  tracing:
+    lambda: true
 
 package:
   exclude:
