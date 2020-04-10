@@ -29,9 +29,6 @@ if __name__ == '__main__':
         # TODO: inject root and parent trace ids
         with xray_recorder.in_segment():
             with xray_recorder.in_subsegment('ocr'):
-                if gm.ocr_and_update(args.info_path):
-                    sys.exit(0)
-                else:
-                    sys.exit(1)
-
-    parser.print_help()
+                gm.ocr_and_update(args.info_path)
+    else:
+        parser.print_help()
