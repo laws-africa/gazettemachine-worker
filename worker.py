@@ -13,7 +13,7 @@ xray_recorder.configure(
     sampling=False,
     plugins=('ECSPlugin',),
 )
-patch(['requests', 'boto3'])
+patch(['requests'])
 
 
 if __name__ == '__main__':
