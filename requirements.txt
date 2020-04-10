@@ -1,2 +1,3 @@
 boto3==1.9.96
 requests==2.21.0
+aws-xray-sdk==2.4.3
