@@ -13,6 +13,7 @@ provider:
   region: eu-west-1
   profile: lawsafrica
   stage: production
+  timeout: 30
   environment:
     API_AUTH_TOKEN: ${ssm:GazetteMachine-API-auth-token}
     MIRROR_TARGETS: ${ssm:GazetteMachine-mirror-targets}
