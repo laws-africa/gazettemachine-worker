@@ -79,19 +79,23 @@ def archived_gazette_changed(event, context):
     """ S3 event. Archived gazette has been created or deleted.
     """
     s3 = boto3.client('s3')
-    prefix = 'archive/'
+    archive_prefix = 'archive/'
 
     for record in event['Records']:
         print("Got S3 event record: {}".format(record))
 
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key'].replace('+', ' ')
-        if not key.startswith(prefix):
+        if not key.startswith(archive_prefix):
             continue
 
-        for access_key, secret_key, tgt_bucket, tgt_prefix in get_mirror_targets():
+        for access_key, secret_key, src_prefix, tgt_bucket, tgt_prefix in get_mirror_targets():
+            # this allows us to mirror only some countries
+            if src_prefix and not key.startswith(src_prefix):
+                continue
+
             s3_tgt = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
-            tgt_key = tgt_prefix + key[len(prefix):]
+            tgt_key = tgt_prefix + key[len(archive_prefix):]
 
             print("Mirror from bucket: {}, key: {} to bucket: {}, key: {}".format(bucket, key, tgt_bucket, tgt_key))
 
@@ -117,16 +121,18 @@ def get_mirror_targets():
     targets = []
 
     for target in MIRROR_TARGETS:
-        # access-key:secret-key@bucket/prefix
+        # access-key:secret-key@prefix:bucket/prefix
         creds, loc = target.split('@')
         creds = creds.split(':')
+
+        src_prefix, loc = loc.split(':', 1)
 
         if '/' in loc:
             bucket, prefix = loc.split('/', 1)
         else:
             bucket = loc
-            prefix = ''
+            tgt_prefix = ''
 
-        targets.append([creds[0], creds[1], bucket, prefix])
+        targets.append([creds[0], creds[1], src_prefix, bucket, tgt_prefix])
 
     return targets
