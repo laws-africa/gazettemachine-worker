@@ -128,7 +128,7 @@ def get_mirror_targets():
         src_prefix, loc = loc.split(':', 1)
 
         if '/' in loc:
-            bucket, prefix = loc.split('/', 1)
+            bucket, tgt_prefix = loc.split('/', 1)
         else:
             bucket = loc
             tgt_prefix = ''
