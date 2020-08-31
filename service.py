@@ -107,6 +107,7 @@ def archived_gazette_changed(event, context):
                     if e.response['Error']['Code'] == 'AccessDenied':
                         print("Ignoring: {}".format(e))
                     else:
+                        print("Error: {}".format(e))
                         raise e
 
             if record['eventName'].startswith('ObjectCreated'):
