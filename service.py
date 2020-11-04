@@ -100,9 +100,9 @@ def archived_gazette_changed(event, context):
             print("Mirror from bucket: {}, key: {} to bucket: {}, key: {}".format(bucket, key, tgt_bucket, tgt_key))
 
             if record['eventName'].startswith('ObjectRemoved'):
-                print("Deleting bucket: {}, key: {}".format(tgt_bucket, tgt_key))
+                print("Deleting object in bucket: {}, key: {}".format(tgt_bucket, tgt_key))
                 try:
-                    s3_tgt.delete_object(Bucket=bucket, Key=key)
+                    s3_tgt.delete_object(Bucket=tgt_bucket, Key=tgt_key)
                 except botocore.exceptions.ClientError as e:
                     if e.response['Error']['Code'] == 'AccessDenied':
                         print("Ignoring: {}".format(e))
