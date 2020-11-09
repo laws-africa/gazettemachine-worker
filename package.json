@@ -14,7 +14,7 @@
   },
   "homepage": "https://github.com/laws-africa/gazettemachine-worker#readme",
   "dependencies": {
-    "serverless": "^1.67.0",
+    "serverless": "^1.83.2",
     "serverless-plugin-existing-s3": "^2.3.0",
     "serverless-python-requirements": "^4.3.0"
   }
