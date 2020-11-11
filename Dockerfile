@@ -1,9 +1,10 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 COPY requirements.txt /tmp/requirements.txt
 
 RUN apt-get update \
-  && apt-get install -y python3-pip \
+  && DEBIAN_FRONTEND=noninteractive \
+     apt-get install -y python3-pip \
                         python3-dev \
                         poppler-utils \
                         tesseract-ocr \
