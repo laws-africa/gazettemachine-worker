@@ -9,6 +9,8 @@ RUN apt-get update \
                         poppler-utils \
                         tesseract-ocr \
                         tesseract-ocr-afr \
+                        tesseract-ocr-fra \
+                        tesseract-ocr-por \
                         ghostscript \
   && pip3 install -r /tmp/requirements.txt \
   && rm -rf /tmp/* /var/tmp/*
