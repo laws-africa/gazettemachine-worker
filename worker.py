@@ -2,18 +2,9 @@ import argparse
 import sys
 import logging
 
-from aws_xray_sdk.core import xray_recorder, patch
-
 from gm.worker import Worker
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-
-xray_recorder.configure(
-    service='GazetteMachineWorker',
-    sampling=False,
-    plugins=('ECSPlugin',),
-)
-patch(['requests'])
 
 
 if __name__ == '__main__':
@@ -26,9 +17,6 @@ if __name__ == '__main__':
     info = None
 
     if args.ocr:
-        # TODO: inject root and parent trace ids
-        with xray_recorder.in_segment():
-            with xray_recorder.in_subsegment('ocr'):
-                gm.ocr_and_update(args.info_path)
+        gm.ocr_and_update(args.info_path)
     else:
         parser.print_help()
