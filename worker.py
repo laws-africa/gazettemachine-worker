@@ -17,7 +17,6 @@ if __name__ == '__main__':
     info = None
 
     if args.ocr:
-        # TODO: inject root and parent trace ids
         gm.ocr_and_update(args.info_path)
     else:
         parser.print_help()
