@@ -9,7 +9,7 @@ plugins:
 
 provider:
   name: aws
-  runtime: python3.7
+  runtime: python3.8
   region: eu-west-1
   profile: lawsafrica
   stage: production
@@ -28,6 +28,7 @@ provider:
       Action:
         - "s3:GetObject"
         - "s3:DeleteObject"
+        - "s3:PutObject"
       Resource:
         - "arn:aws:s3:::lawsafrica-gazettes-incoming"
         - "arn:aws:s3:::lawsafrica-gazettes-incoming/*"
@@ -46,6 +47,10 @@ package:
   include:
     - service.py
 
+custom:
+  pythonRequirements:
+    slim: true
+
 functions:
   IncomingFromS3:
     handler: service.incoming_from_s3
@@ -53,24 +58,30 @@ functions:
       - s3:
         bucket: lawsafrica-gazettes-incoming
         existing: true
-        events:
-          - s3:ObjectCreated:*
+        event: s3:ObjectCreated:*
         rules:
           - prefix: dropbox/
+  EmailFromS3:
+    handler: service.email_from_s3
+    events:
+      - s3:
+        bucket: lawsafrica-gazettes-incoming
+        existing: true
+        event: s3:ObjectCreated:*
+        rules:
+          - prefix: email/
   ArchivedGazetteChanged:
     handler: service.archived_gazette_changed
     events:
       - s3:
         bucket: lawsafrica-gazettes-archive
-        events:
-          - s3:ObjectCreated:*
+        event: s3:ObjectCreated:*
         rules:
           - prefix: archive/
         existing: true
       - s3:
         bucket: lawsafrica-gazettes-archive
-        events:
-          - s3:ObjectRemoved:*
+        event: s3:ObjectRemoved:*
         rules:
           - prefix: archive/
         existing: true
