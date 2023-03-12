@@ -63,12 +63,12 @@ class Worker:
         self.tmpfile.seek(0, 2)
         self.tmpfile.seek(0)
 
-        key = s3_location.split('/', 1)[1]
-        ocr_key = f'{self.TEMP_PATH}{key}-ocr.pdf'
-        ocr_location = f'{self.INCOMING_BUCKET}/{ocr_key}'
+        bucket, key = s3_location.split('/', 1)
+        ocr_key = f'{key}-ocr.pdf'
+        ocr_location = f'{bucket}/{ocr_key}'
 
         log.info(f"Uploading OCRd file to {ocr_location}")
-        self.s3.put_object(Bucket=self.INCOMING_BUCKET, Key=ocr_key, Body=self.tmpfile)
+        self.s3.put_object(Bucket=bucket, Key=ocr_key, Body=self.tmpfile)
         return ocr_location
 
     def ocr_file(self, target):
@@ -92,7 +92,7 @@ class Worker:
 
     def update_gm(self, info, url):
         log.info(f"Updating GM {url}: {info}")
-        resp = requests.put(url, timeout=TIMEOUT, json=info, headers=self.headers)
+        resp = requests.post(url, timeout=TIMEOUT, json=info, headers=self.headers)
         log.info(f"Response: {resp.text}")
         resp.raise_for_status()
 
