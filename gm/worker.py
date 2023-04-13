@@ -64,7 +64,7 @@ class Worker:
         self.tmpfile.seek(0)
 
         bucket, key = s3_location.split('/', 1)
-        ocr_key = f'{key}-ocr.pdf'
+        ocr_key = f'ocr/{key}-ocr.pdf'
         ocr_location = f'{bucket}/{ocr_key}'
 
         log.info(f"Uploading OCRd file to {ocr_location}")
