@@ -5,7 +5,7 @@ This is two things:
 1. a Docker image that does heavy lifting for Gazette Machine, run as an ECS task.
 2. a collection of AWS Lambdas that call out to the [Gazette Machine API](https://github.com/laws-africa/gazettemachine-api).
 
-Image at Docker Hub: [lawsafrica/gazettemachine-worker](https://hub.docker.com/r/lawsafrica/gazettemachine-worker)
+Docker image in GitHub: [lawsafrica/gazettemachine-worker](https://github.com/orgs/laws-africa/packages/container/package/gazettemachine-worker)
 
 The `GazetteMachine-API-auth-token` auth token is stored in the AWS SSM Parameter Store. If this token is changed,
 the AWS Lambda function must be redeployed (see Deployment section below) so that it picks up the new token.
