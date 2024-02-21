@@ -11,7 +11,7 @@ import requests
 API_AUTH_TOKEN = os.environ['API_AUTH_TOKEN']
 API_URL = os.environ.get('API_URL', 'https://api.gazettes.laws.africa/v1')
 TIMEOUT = 30
-MIRROR_TARGETS = os.environ.get('MIRROR_TARGETS', '').split(' ')
+MIRROR_TARGETS = [x.strip() for x in os.environ.get('MIRROR_TARGETS', '').split(' ') if x.strip()]
 
 session = requests.Session()
 session.headers.update({'Authorization': 'Token %s' % API_AUTH_TOKEN})
@@ -175,6 +175,8 @@ def get_mirror_targets():
 
     for target in MIRROR_TARGETS:
         # access-key:secret-key@prefix:bucket/prefix
+        if not '@' in target:
+            continue
         creds, loc = target.split('@')
         creds = creds.split(':')
 
