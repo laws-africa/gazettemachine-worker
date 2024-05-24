@@ -11,7 +11,7 @@ import requests
 API_AUTH_TOKEN = os.environ['API_AUTH_TOKEN']
 API_URL = os.environ.get('API_URL', 'https://api.gazettes.laws.africa/v1')
 TIMEOUT = 30
-MIRROR_TARGETS = [x.strip() for x in os.environ.get('MIRROR_TARGETS', '').split(' ') if x.strip()]
+MIRROR_TARGETS = [x.strip() for x in os.environ.get('MIRROR_TARGETS', '').split() if x.strip()]
 
 session = requests.Session()
 session.headers.update({'Authorization': 'Token %s' % API_AUTH_TOKEN})
@@ -141,46 +141,54 @@ def archived_gazette_changed(event, context):
         if not key.startswith(archive_prefix):
             continue
 
-        for access_key, secret_key, src_prefix, tgt_bucket, tgt_prefix in get_mirror_targets():
+        for access_key, secret_key, endpoint, region, src_prefix, ops, tgt_bucket, tgt_prefix in get_mirror_targets():
             # this allows us to mirror only some countries
             if src_prefix and not key.startswith(src_prefix):
                 continue
 
-            s3_tgt = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+            s3_tgt = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key,
+                                  endpoint_url=endpoint, region_name=region)
             tgt_key = tgt_prefix + key[len(archive_prefix):]
 
-            print("Mirror from bucket: {}, key: {} to bucket: {}, key: {}".format(bucket, key, tgt_bucket, tgt_key))
+            for operation in ops:
+                if record['eventName'].startswith(operation):
+                    print("Mirror from bucket: {}, key: {} to bucket: {}, key: {}".format(bucket, key, tgt_bucket,
+                                                                                          tgt_key))
 
-            if record['eventName'].startswith('ObjectRemoved'):
-                print("Deleting object in bucket: {}, key: {}".format(tgt_bucket, tgt_key))
-                try:
-                    s3_tgt.delete_object(Bucket=tgt_bucket, Key=tgt_key)
-                except botocore.exceptions.ClientError as e:
-                    if e.response['Error']['Code'] == 'AccessDenied':
-                        print("Ignoring: {}".format(e))
-                    else:
-                        print("Error: {}".format(e))
-                        raise e
+                    if record['eventName'].startswith('ObjectRemoved'):
+                        print("Deleting object in bucket: {}, key: {}".format(tgt_bucket, tgt_key))
+                        try:
+                            s3_tgt.delete_object(Bucket=tgt_bucket, Key=tgt_key)
+                        except botocore.exceptions.ClientError as e:
+                            if e.response['Error']['Code'] == 'AccessDenied':
+                                print("Ignoring: {}".format(e))
+                            else:
+                                print("Error: {}".format(e))
+                                raise e
 
-            if record['eventName'].startswith('ObjectCreated'):
-                print("Copying to bucket: {}, key: {}".format(tgt_bucket, tgt_key))
-                with tempfile.TemporaryFile() as f:
-                    s3.download_fileobj(bucket, key, f)
-                    f.seek(0)
-                    s3_tgt.upload_fileobj(f, tgt_bucket, tgt_key)
+                    if record['eventName'].startswith('ObjectCreated'):
+                        print("Copying to bucket: {}, key: {}".format(tgt_bucket, tgt_key))
+                        with tempfile.TemporaryFile() as f:
+                            s3.download_fileobj(bucket, key, f)
+                            f.seek(0)
+                            s3_tgt.upload_fileobj(f, tgt_bucket, tgt_key)
 
 
 def get_mirror_targets():
     targets = []
 
     for target in MIRROR_TARGETS:
-        # access-key:secret-key@prefix:bucket/prefix
+        # access-key:secret-key:endpoint:region@prefix:operations:bucket/prefix
         if not '@' in target:
             continue
         creds, loc = target.split('@')
         creds = creds.split(':')
 
-        src_prefix, loc = loc.split(':', 1)
+        endpoint = creds[2]
+        endpoint = f"https://{endpoint}" if endpoint else None
+
+        src_prefix, ops, loc = loc.split(':', 2)
+        ops = ops.split(',')
 
         if '/' in loc:
             bucket, tgt_prefix = loc.split('/', 1)
@@ -188,6 +196,6 @@ def get_mirror_targets():
             bucket = loc
             tgt_prefix = ''
 
-        targets.append([creds[0], creds[1], src_prefix, bucket, tgt_prefix])
+        targets.append([creds[0], creds[1], endpoint, creds[3] or None, src_prefix, ops, bucket, tgt_prefix])
 
     return targets
