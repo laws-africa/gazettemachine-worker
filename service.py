@@ -100,6 +100,9 @@ def email_from_s3(event, context):
                 f.seek(0)
                 msg = email.message_from_string(f.read().decode('utf-8'))
 
+            details = "\n".join([f"{k}: {v}" for k, v in msg.items()])
+            print(f"Processing message: \n---\n{details}---")
+
             # clean up the message id to use a as a prefix to ensure the pdf names are unique
             msg_id = re.sub('[^a-zA-Z0-9@.-]', '-', msg['message-id'])
 
