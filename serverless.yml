@@ -22,16 +22,7 @@ provider:
       Action:
         - "s3:PutBucketNotification"
       Resource:
-        - "arn:aws:s3:::lawsafrica-gazettes-incoming"
         - "arn:aws:s3:::lawsafrica-gazettes-archive"
-    - Effect: "Allow"
-      Action:
-        - "s3:GetObject"
-        - "s3:DeleteObject"
-        - "s3:PutObject"
-      Resource:
-        - "arn:aws:s3:::lawsafrica-gazettes-incoming"
-        - "arn:aws:s3:::lawsafrica-gazettes-incoming/*"
     - Effect: "Allow"
       Action:
         - "s3:GetObject"
@@ -52,15 +43,6 @@ custom:
     slim: true
 
 functions:
-  IncomingFromS3:
-    handler: service.incoming_from_s3
-    events:
-      - s3:
-        bucket: lawsafrica-gazettes-incoming
-        existing: true
-        event: s3:ObjectCreated:*
-        rules:
-          - prefix: dropbox/
   ArchivedGazetteChanged:
     handler: service.archived_gazette_changed
     events:
