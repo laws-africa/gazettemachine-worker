@@ -61,15 +61,6 @@ functions:
         event: s3:ObjectCreated:*
         rules:
           - prefix: dropbox/
-  EmailFromS3:
-    handler: service.email_from_s3
-    events:
-      - s3:
-        bucket: lawsafrica-gazettes-incoming
-        existing: true
-        event: s3:ObjectCreated:*
-        rules:
-          - prefix: email/
   ArchivedGazetteChanged:
     handler: service.archived_gazette_changed
     events:

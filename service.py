@@ -1,8 +1,6 @@
 import tempfile
 import os
 import csv
-import re
-import email
 
 import boto3
 import botocore
@@ -77,57 +75,6 @@ def csv_from_s3(bucket, key):
     resp.raise_for_status()
 
     s3.delete_object(Bucket=bucket, Key=key)
-
-
-def email_from_s3(event, context):
-    """ AWS SES put an encoming email into S3 for us to process.
-    """
-    for record in event['Records']:
-        print(f"Got S3 event record: {record}")
-        bucket = record['s3']['bucket']['name']
-        key = record['s3']['object']['key'].replace('+', ' ')
-
-        # determine jurisdiction
-        # email/za-fs/foo
-        match = re.match(r'^email/([^/]+)/.+', key)
-        if match:
-            jurisdiction = match.group(1)
-
-            # extract attachments from the email and add to the dropbox folder in s3
-            s3 = boto3.client('s3')
-            with tempfile.TemporaryFile() as f:
-                s3.download_fileobj(bucket, key, f)
-                f.seek(0)
-                msg = email.message_from_string(f.read().decode('utf-8'))
-
-            details = "\n".join([f"{k}: {v}" for k, v in msg.items()])
-            print(f"Processing message: \n---\n{details}---")
-
-            # clean up the message id to use a as a prefix to ensure the pdf names are unique
-            msg_id = re.sub('[^a-zA-Z0-9@.-]', '-', msg['message-id'])
-
-            for part in msg.walk():
-                if part.get_content_type() == 'application/pdf':
-                    print(f"Processing part: {part.items()}")
-
-                    # ensure original attachment filename is usable
-                    filename = part.get_filename().replace('/', '-')
-                    if not filename.lower().endswith('.pdf'):
-                        filename = filename + '.pdf'
-
-                    with tempfile.TemporaryFile() as f:
-                        tgt_key = f'dropbox/{jurisdiction}/{msg_id}/{filename}'
-                        print(f"Writing attachment to {bucket}/{tgt_key}")
-                        f.write(part.get_payload(decode=True))
-                        f.seek(0)
-                        s3.upload_fileobj(f, bucket, tgt_key)
-
-            # delete object
-            print(f"Deleting message from S3: {bucket}/{key}")
-            s3.delete_object(Bucket=bucket, Key=key)
-            return
-
-        print(f"Ignored: {key}")
 
 
 def archived_gazette_changed(event, context):
