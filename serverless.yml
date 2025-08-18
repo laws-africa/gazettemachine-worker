@@ -9,7 +9,7 @@ plugins:
 
 provider:
   name: aws
-  runtime: python3.8
+  runtime: python3.10
   region: eu-west-1
   profile: lawsafrica
   stage: production
